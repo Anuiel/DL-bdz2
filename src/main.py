@@ -147,10 +147,10 @@ def load_everything(
 def main(mode: TrainMode, commit_hash: str, pretrain_path: Path | None = None):
     stuff = load_everything(
         train_size=0.97,
-        batch_size=64,
-        source_vocab_size=6000,
-        target_vocab_size=6000,
-        max_len=256,
+        batch_size=24,
+        source_vocab_size=30000,
+        target_vocab_size=30000,
+        max_len=512,
         N=5,
         embed_dim=256,
         fc_dim=1024,
