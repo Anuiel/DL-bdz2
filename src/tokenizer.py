@@ -1,7 +1,7 @@
 from pathlib import Path
 from typing import Any
 
-from sentencepiece import SentencePieceProcessor
+from sentencepiece import SentencePieceProcessor, SentencePieceTrainer
 
 # https://github.com/google/sentencepiece/blob/master/doc/options.md
 
@@ -32,9 +32,9 @@ def load_tokenizer(
     cfg = get_tokenizer_config(lang, vocab_size, path_to_data, path_to_save)
     tokenizer_model_name = cfg['model_prefix'].with_suffix('.model')
     if not (tokenizer_model_name).exists():
-        SentencePieceProcessor.train(**cfg)
+        SentencePieceTrainer.train(**cfg)
     tokenizer = SentencePieceProcessor()
-    tokenizer.load(tokenizer_model_name)
+    tokenizer.load(str(tokenizer_model_name))
     return tokenizer
 
 

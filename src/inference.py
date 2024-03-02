@@ -10,9 +10,22 @@ from sacrebleu.metrics import BLEUScore, BLEU
 from src.transformer import Transformer
 
 
-def top_k_sampling(logits: torch.Tensor, k: int = 50):
-    reduced_logist, args = logits.topk(sorted=False, k=k)
-    return args[Categorical(logits=reduced_logist).sample()]
+def top_sampling(logits: torch.Tensor, k: int = 50, p: float = 0.92):
+    if k > 0:
+        indices_to_remove = logits < torch.topk(logits, k)[0][-1, None]
+        logits[indices_to_remove] = -torch.inf
+    sorted_logits, sorted_indices = torch.sort(logits, descending=True)
+
+    cumulative_probs = torch.cumsum(torch.nn.functional.softmax(sorted_logits, dim=-1), dim=-1)
+    sorted_indices_to_remove = cumulative_probs > p
+    sorted_indices_to_remove[1:] = sorted_indices_to_remove[:-1].clone()
+    sorted_indices_to_remove[0] = 0
+    
+    sorted_logits[sorted_indices_to_remove] = -torch.inf
+    logits = torch.gather(sorted_logits, 0, sorted_indices.argsort(-1))
+    pred_token = torch.multinomial(torch.nn.functional.softmax(logits, -1), 1)
+    return pred_token
+
 
 def greedy_sampling(logits: torch.Tensor):
     return logits.argmax(dim=-1)
@@ -42,7 +55,7 @@ def inference(
 
         out = model.decode(decoder_input, decoder_mask, encoder_output, source_mask)
         logits = model.generate(out[:, -1].squeeze(0))
-        next_token = greedy_sampling(logits)
+        next_token = top_sampling(logits, k=20, p=0.92)
 
         decoder_input = torch.cat(
             [decoder_input, torch.empty(1, 1).type_as(source_tokens).fill_(next_token.item()).to(device)], dim=1

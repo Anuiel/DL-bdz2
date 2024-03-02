@@ -14,7 +14,7 @@ from src.dataset import LanguageDataset, LanguageDatasetTokenized, split_train_v
 from src.tokenizer import load_tokenizers
 from src.transformer import Transformer
 from src.train import run_epoch, TrainMode
-from src.inference import inference
+from src.inference import inference, blue_score
 
 PATH_TO_DATA = Path('/home/anuiel/Remote/Anuiel/dl-bdz2/data')
 PATH_TO_TOKENIZERS = PATH_TO_DATA / 'tokenizer'
@@ -39,10 +39,11 @@ def create_loaders(
 
     train_dataset, val_dataset = split_train_val(dataset, train_size=train_size, random_seed=random_seed)
 
-    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, collate_fn=collate)
-    val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False, collate_fn=collate)
+    train_loader = DataLoader(train_dataset, batch_size=batch_size, num_workers=2, shuffle=True, collate_fn=collate)
+    val_loader = DataLoader(val_dataset, batch_size=batch_size, num_workers=2, shuffle=False, collate_fn=collate)
+    inference_loader = DataLoader(val_dataset, batch_size=1, shuffle=False, collate_fn=collate)
 
-    return train_loader, val_loader
+    return train_loader, val_loader, inference_loader
 
 
 def load_model(
@@ -113,7 +114,9 @@ def load_everything(
 
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
     en_sp, de_sp = load_tokenizers(source_vocab_size, PATH_TO_TEXT, PATH_TO_TOKENIZERS)
-    train_loader, val_loader = create_loaders(de_sp, en_sp, max_len, batch_size, train_size, random_seed=random_seed)
+    train_loader, val_loader, inference_loader = create_loaders(
+        de_sp, en_sp, max_len, batch_size, train_size, random_seed=random_seed
+    )
     model, optim, scheduler = load_model(
         source_vocab_size=source_vocab_size,
         target_vocab_size=target_vocab_size,
@@ -136,14 +139,14 @@ def load_everything(
     return {
         'tokenizers': (de_sp, en_sp),
         'model': (model, optim, scheduler),
-        'loader': (train_loader, val_loader),
+        'loader': (train_loader, val_loader, inference_loader),
         'loss_func': loss_func,
         'device': device
     }
 
-def main(mode: TrainMode, commit_hash: str):
+def main(mode: TrainMode, commit_hash: str, pretrain_path: Path | None = None):
     stuff = load_everything(
-        train_size=0.95,
+        train_size=0.97,
         batch_size=64,
         source_vocab_size=6000,
         target_vocab_size=6000,
@@ -153,12 +156,13 @@ def main(mode: TrainMode, commit_hash: str):
         fc_dim=1024,
         heads=8,
         dropout_rate=0.0,
+        label_smoothing=0.1,
         random_seed=228,
-        model_pre_train=None
+        model_pre_train=pretrain_path
     )
     de_sp, en_sp = stuff['tokenizers']
     model, optim, scheduler = stuff['model']
-    train_loader, val_loader = stuff['loader']
+    train_loader, val_loader, inference_loader = stuff['loader']
     loss_func = stuff['loss_func']
     device = stuff['device']
 
@@ -192,13 +196,14 @@ def main(mode: TrainMode, commit_hash: str):
         torch.save(model.state_dict(), PATH_TO_MODEL / f'{wandb.run.id}.pth')
 
     elif mode == TrainMode.EVAL:
-        test_dataset = LanguageDataset(PATH_TO_DATA / 'test1.de-en.de')
-        test_dataset_tokenized = LanguageDatasetTokenized(test_dataset, de_sp, en_sp, 256)
+        print(blue_score(inference_loader, model, en_sp, device))
+        # test_dataset = LanguageDataset(PATH_TO_DATA / 'test1.de-en.de')
+        # test_dataset_tokenized = LanguageDatasetTokenized(test_dataset, de_sp, en_sp, 256)
 
-        with open(PATH_TO_DATA / 'test1.de-en.en', 'w') as output_file: 
-            for batch in tqdm(test_dataset_tokenized):
-                source_tokens = batch.encoder_input.to(device).unsqueeze(0)
-                encoder_mask = ~batch.encoder_mask.unsqueeze(0).unsqueeze(1).unsqueeze(1).to(device)
+        # with open(PATH_TO_DATA / 'test1.de-en.en', 'w') as output_file: 
+        #     for batch in tqdm(test_dataset_tokenized):
+        #         source_tokens = batch.encoder_input.to(device).unsqueeze(0)
+        #         encoder_mask = ~batch.encoder_mask.unsqueeze(0).unsqueeze(1).unsqueeze(1).to(device)
 
-                target = inference(model, source_tokens, encoder_mask, en_sp, 128, device)
-                output_file.write(target + '\n')
+        #         target = inference(model, source_tokens, encoder_mask, en_sp, 128, device)
+        #         output_file.write(target + '\n')
