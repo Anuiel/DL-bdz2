@@ -141,7 +141,7 @@ def load_everything(
         'device': device
     }
 
-def main(mode: TrainMode):
+def main(mode: TrainMode, commit_hash: str):
     stuff = load_everything(
         train_size=0.95,
         batch_size=64,
@@ -165,7 +165,12 @@ def main(mode: TrainMode):
     if mode == TrainMode.TRAIN:
 
         wandb.login()
-        wandb.init(project="bdz2")
+        wandb.init(
+            project="bdz2",
+            config={
+                'commit-hash': commit_hash
+            }
+        )
 
         train_iteration = 0
         val_iteration = 0

@@ -1,12 +1,21 @@
+from pathlib import Path
+
 import torch
 from torch.distributions.categorical import Categorical
+from torch.utils.data import DataLoader
 from sentencepiece import SentencePieceProcessor
+from tqdm import tqdm
+from sacrebleu.metrics import BLEUScore, BLEU
 
 from src.transformer import Transformer
+
 
 def top_k_sampling(logits: torch.Tensor, k: int = 50):
     reduced_logist, args = logits.topk(sorted=False, k=k)
     return args[Categorical(logits=reduced_logist).sample()]
+
+def greedy_sampling(logits: torch.Tensor):
+    return logits.argmax(dim=-1)
 
 def inference(
     model: Transformer,
@@ -33,7 +42,7 @@ def inference(
 
         out = model.decode(decoder_input, decoder_mask, encoder_output, source_mask)
         logits = model.generate(out[:, -1].squeeze(0))
-        next_token = top_k_sampling(logits)
+        next_token = greedy_sampling(logits)
 
         decoder_input = torch.cat(
             [decoder_input, torch.empty(1, 1).type_as(source_tokens).fill_(next_token.item()).to(device)], dim=1
@@ -42,3 +51,39 @@ def inference(
             break
 
     return target_tokenizer.Decode(list(map(int, decoder_input.squeeze(0).detach().cpu().numpy())))
+
+
+def blue_score(
+    loader: DataLoader,
+    model: Transformer,
+    target_tokenizer: SentencePieceProcessor,
+    device: torch.device
+) -> BLEUScore:
+    scorer = BLEU(
+        tokenize=None
+    )
+
+    ground_truth = []
+    predicted = []
+    for batch in tqdm(loader):
+        source_tokens = batch.encoder_input.to(device).unsqueeze(0)
+        encoder_mask = ~batch.encoder_mask.unsqueeze(0).unsqueeze(1).to(device)
+        target = inference(model, source_tokens, encoder_mask, target_tokenizer, 128, device)
+        ground_truth.append(batch.original_text['target_text'][0])
+        predicted.append(target)
+    return scorer.corpus_score(predicted, [ground_truth])
+
+def eval_test(
+    path_to_file: Path,
+    loader: DataLoader,
+    model: Transformer,
+    target_tokenizer: SentencePieceProcessor,
+    device: torch.device,
+):
+    with open(path_to_file, 'w') as output_file: 
+        for batch in tqdm(loader):
+            source_tokens = batch.encoder_input.to(device).unsqueeze(0)
+            encoder_mask = ~batch.encoder_mask.unsqueeze(0).unsqueeze(1).unsqueeze(1).to(device)
+
+            target = inference(model, source_tokens, encoder_mask, target_tokenizer, 128, device)
+            output_file.write(target + '\n')

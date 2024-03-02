@@ -1,1 +1,1 @@
-from transformer_net import Transformer
+from .transformer_net import Transformer
