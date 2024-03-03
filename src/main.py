@@ -39,8 +39,12 @@ def create_loaders(
 
     train_dataset, val_dataset = split_train_val(dataset, train_size=train_size, random_seed=random_seed)
 
-    train_loader = DataLoader(train_dataset, batch_size=batch_size, num_workers=2, shuffle=True, collate_fn=collate)
-    val_loader = DataLoader(val_dataset, batch_size=batch_size, num_workers=2, shuffle=False, collate_fn=collate)
+    train_loader = DataLoader(
+        train_dataset, batch_size=batch_size, num_workers=2, shuffle=True, collate_fn=collate, pin_memory=True
+    )
+    val_loader = DataLoader(
+        val_dataset, batch_size=batch_size, num_workers=2, shuffle=False, collate_fn=collate, pin_memory=True
+    )
     inference_loader = DataLoader(val_dataset, batch_size=1, shuffle=False, collate_fn=collate)
 
     return train_loader, val_loader, inference_loader

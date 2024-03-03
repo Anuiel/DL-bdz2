@@ -30,6 +30,8 @@ def top_sampling(logits: torch.Tensor, k: int = 50, p: float = 0.92):
 def greedy_sampling(logits: torch.Tensor):
     return logits.argmax(dim=-1)
 
+
+@torch.no_grad()
 def inference(
     model: Transformer,
     source_tokens: torch.Tensor,
@@ -66,6 +68,7 @@ def inference(
     return target_tokenizer.Decode(list(map(int, decoder_input.squeeze(0).detach().cpu().numpy())))
 
 
+@torch.no_grad()
 def blue_score(
     loader: DataLoader,
     model: Transformer,
