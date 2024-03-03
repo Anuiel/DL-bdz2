@@ -147,7 +147,7 @@ def load_everything(
 def main(mode: TrainMode, commit_hash: str, pretrain_path: Path | None = None):
     stuff = load_everything(
         train_size=0.97,
-        batch_size=24,
+        batch_size=48,
         source_vocab_size=30000,
         target_vocab_size=30000,
         max_len=256,

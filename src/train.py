@@ -27,7 +27,7 @@ def run_epoch(
         model.train()
     elif mode == TrainMode.EVAL:
         model.eval()
-
+    optimizer.zero_grad()
     mask = Transformer.causal_mask(256).unsqueeze(0).to(device)
     iterator = tqdm(enumerate(dataloader))
     for i, batch in iterator:
@@ -45,8 +45,9 @@ def run_epoch(
 
         if mode == TrainMode.TRAIN:
             loss.backward()
-            optimizer.step()
-            optimizer.zero_grad()
+            if i % 3 == 0:
+                optimizer.step()
+                optimizer.zero_grad()
             if scheduler is not None:
                 scheduler.step()
 
