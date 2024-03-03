@@ -148,12 +148,12 @@ def main(mode: TrainMode, commit_hash: str, pretrain_path: Path | None = None):
     stuff = load_everything(
         train_size=0.97,
         batch_size=24,
-        source_vocab_size=6000,
-        target_vocab_size=6000,
+        source_vocab_size=30000,
+        target_vocab_size=30000,
         max_len=256,
         N=5,
-        embed_dim=256,
-        fc_dim=1024,
+        embed_dim=512,
+        fc_dim=2048,
         heads=8,
         dropout_rate=0.0,
         label_smoothing=0.1,
@@ -197,13 +197,13 @@ def main(mode: TrainMode, commit_hash: str, pretrain_path: Path | None = None):
 
     elif mode == TrainMode.EVAL:
         print(blue_score(inference_loader, model, en_sp, device))
-        # test_dataset = LanguageDataset(PATH_TO_DATA / 'test1.de-en.de')
-        # test_dataset_tokenized = LanguageDatasetTokenized(test_dataset, de_sp, en_sp, 256)
+        test_dataset = LanguageDataset(PATH_TO_DATA / 'test1.de-en.de')
+        test_dataset_tokenized = LanguageDatasetTokenized(test_dataset, de_sp, en_sp, 256)
 
-        # with open(PATH_TO_DATA / 'test1.de-en.en', 'w') as output_file: 
-        #     for batch in tqdm(test_dataset_tokenized):
-        #         source_tokens = batch.encoder_input.to(device).unsqueeze(0)
-        #         encoder_mask = ~batch.encoder_mask.unsqueeze(0).unsqueeze(1).unsqueeze(1).to(device)
+        with open(PATH_TO_DATA / 'test1.de-en.en', 'w') as output_file: 
+            for batch in tqdm(test_dataset_tokenized):
+                source_tokens = batch.encoder_input.to(device).unsqueeze(0)
+                encoder_mask = ~batch.encoder_mask.unsqueeze(0).unsqueeze(1).unsqueeze(1).to(device)
 
-        #         target = inference(model, source_tokens, encoder_mask, en_sp, 128, device)
-        #         output_file.write(target + '\n')
+                target = inference(model, source_tokens, encoder_mask, en_sp, 128, device)
+                output_file.write(target + '\n')

@@ -14,8 +14,9 @@ def get_tokenizer_config(
 ) -> dict[str, Any]:
     return {
         'input': path_to_data / f'train.{lang}',
-        'model_prefix': path_to_save / f'{lang}-{vocab_size}',
+        'model_prefix': path_to_save / f'{lang}-word-{vocab_size}',
         'vocab_size': vocab_size,
+        'model_type': 'word',
         'pad_id': 0, 'pad_piece': '[PAD]',
         'unk_id': 1, 'unk_piece': '[UNK]',
         'bos_id': 2, 'bos_piece': '[BOS]',
