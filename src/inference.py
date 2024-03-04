@@ -57,7 +57,7 @@ def inference(
 
         out = model.decode(decoder_input, decoder_mask, encoder_output, source_mask)
         logits = model.generate(out[:, -1].squeeze(0))
-        next_token = top_sampling(logits, k=20, p=0.92)
+        next_token = top_sampling(logits, k=1, p=0.92)
 
         decoder_input = torch.cat(
             [decoder_input, torch.empty(1, 1).type_as(source_tokens).fill_(next_token.item()).to(device)], dim=1

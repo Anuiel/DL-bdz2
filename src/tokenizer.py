@@ -40,11 +40,12 @@ def load_tokenizer(
 
 
 def load_tokenizers(
-    vocab_size: int,
+    source_vocab_size: int,
+    target_vocab_size: int,
     path_to_data: Path,
     path_to_save: Path,
 ) -> tuple[SentencePieceProcessor, SentencePieceProcessor]:
     return (
-        load_tokenizer('en', vocab_size, path_to_data, path_to_save),
-        load_tokenizer('de', vocab_size, path_to_data, path_to_save),
+        load_tokenizer('de', source_vocab_size, path_to_data, path_to_save),
+        load_tokenizer('en', target_vocab_size, path_to_data, path_to_save),
     )

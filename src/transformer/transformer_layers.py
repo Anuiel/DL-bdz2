@@ -4,6 +4,7 @@ from torch import nn
 from src.transformer.attention import MultiHeadAttention
 from src.transformer.encoding import PositionalEncoding
 
+
 class EncoderLayer(nn.Module):
     def __init__(self, embed_dim: int, fc_dim: int, num_heads: int, dropout_rate: float):
         """
@@ -38,8 +39,8 @@ class EncoderLayer(nn.Module):
             mask=mask
         )
 
-        outputs = self.norm1(inputs + attention)
-        outputs = self.norm2(outputs + self.feedforward(outputs))
+        outputs = inputs + self.norm1(attention)
+        outputs = outputs + self.norm2(self.feedforward(outputs))
         return outputs
 
 
@@ -87,15 +88,15 @@ class DecoderLayer(nn.Module):
             value=inputs,
             mask=mask
         )
-        outputs = self.norm1(inputs + attention)
+        outputs = inputs + self.norm1(attention)
         attention = self.self_attention(
             query=outputs,
             key=encoder_output,
             value=encoder_output,
             mask=encoder_mask
         )
-        outputs = self.norm2(outputs + attention)
-        outputs = self.norm3(outputs + self.feedforward(outputs))
+        outputs = outputs + self.norm2(attention)
+        outputs = outputs + self.norm3(self.feedforward(outputs))
         return outputs
 
 

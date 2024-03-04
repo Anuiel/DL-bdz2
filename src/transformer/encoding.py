@@ -41,4 +41,4 @@ class PositionalEncoding(nn.Module):
         """
         `x`: (B, L, d) -> (B, L, d)
         """
-        return self.dropout(x + self.pos_encoding[:, :x.shape[1]])
+        return self.dropout(x + self.pos_encoding)

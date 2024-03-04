@@ -87,16 +87,18 @@ class LanguageDatasetTokenized(Dataset):
     def __getitem__(self, index: int):
         language_pair = self.dataset[index]
 
-        source_tokens = self.source_tokenizer.Encode(language_pair.source_text, add_bos=True, add_eos=True)
+        source_tokens = self.source_tokenizer.Encode(language_pair.source_text, add_bos=False, add_eos=False)
         target_tokens = self.target_tokenizer.Encode(language_pair.target_text, add_bos=False, add_eos=False)
 
-        source_padding_count = self.seq_len - len(source_tokens)
+        source_padding_count = self.seq_len - len(source_tokens) - 2
         target_padding_count = self.seq_len - len(target_tokens) - 1
         if source_padding_count < 0 or target_padding_count < 0:
-            raise ValueError('Too large sequence! Maybe increase seq_len?')
+            raise ValueError('Too large sequence!')
 
         encoder_input = torch.cat((
+            torch.tensor([self.source_tokenizer.bos_id()]),
             torch.tensor(source_tokens, dtype=torch.int64),
+            torch.tensor([self.source_tokenizer.eos_id()]),
             torch.tensor([self.pad_id] * source_padding_count, dtype=torch.int64)
         ))
 

@@ -88,10 +88,11 @@ def load_model(
             model_size ** (-0.5) * min(step ** (-0.5), step * warmup ** (-1.5))
         )
 
-    optim = Adam(model.parameters(), lr=1.0, betas=(0.9, 0.98), eps=1e-9)
-    lr_scheduler = LambdaLR(
-        optimizer=optim, lr_lambda=lambda step: rate(step, embed_dim, 1.0, 3000)
-    )
+    optim = Adam(model.parameters(), lr=0.0001, betas=(0.9, 0.98), eps=1e-9)
+    # lr_scheduler = LambdaLR(
+    #     optimizer=optim, lr_lambda=lambda step: rate(step, embed_dim, 1.0, 3000)
+    # )
+    lr_scheduler = None
 
     return model, optim, lr_scheduler
 
@@ -117,7 +118,7 @@ def load_everything(
     torch.cuda.manual_seed_all(random_seed)
 
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
-    en_sp, de_sp = load_tokenizers(source_vocab_size, PATH_TO_TEXT, PATH_TO_TOKENIZERS)
+    de_sp, en_sp = load_tokenizers(source_vocab_size, target_vocab_size, PATH_TO_TEXT, PATH_TO_TOKENIZERS)
     train_loader, val_loader, inference_loader = create_loaders(
         de_sp, en_sp, max_len, batch_size, train_size, random_seed=random_seed
     )
@@ -151,11 +152,11 @@ def load_everything(
 def main(mode: TrainMode, commit_hash: str, pretrain_path: Path | None = None):
     stuff = load_everything(
         train_size=0.97,
-        batch_size=48,
-        source_vocab_size=30000,
-        target_vocab_size=30000,
+        batch_size=32,
+        source_vocab_size=100000,
+        target_vocab_size=55000,
         max_len=256,
-        N=5,
+        N=3,
         embed_dim=512,
         fc_dim=2048,
         heads=8,
@@ -172,42 +173,29 @@ def main(mode: TrainMode, commit_hash: str, pretrain_path: Path | None = None):
 
     if mode == TrainMode.TRAIN:
 
-        wandb.login()
-        wandb.init(
-            project="bdz2",
-            config={
-                'commit-hash': commit_hash
-            }
-        )
+        # wandb.login()
+        # wandb.init(
+        #     project="bdz2",
+        #     config={
+        #         'commit-hash': commit_hash
+        #     }
+        # )
 
-        train_iteration = 0
-        val_iteration = 0
-        for _ in range(8):
+        for _ in range(3):
             torch.cuda.empty_cache()
-            for i, x in enumerate(run_epoch(model, train_loader, optim, loss_func, scheduler, TrainMode.TRAIN, device)):
-                train_iteration += 1
-                wandb.log({
-                    'train loss': x,
-                    'train step': train_iteration
-                })
-
-            for j, y in enumerate(run_epoch(model, val_loader, optim, loss_func, scheduler, TrainMode.EVAL, device)):
-                val_iteration += 1
-                wandb.log({
-                    'val loss': y,
-                    'val step': val_iteration
-                }) 
+            run_epoch(model, train_loader, optim, loss_func, scheduler, TrainMode.TRAIN, device)
+            run_epoch(model, val_loader, optim, loss_func, scheduler, TrainMode.EVAL, device)
         torch.save(model.state_dict(), PATH_TO_MODEL / f'{wandb.run.id}.pth')
 
     elif mode == TrainMode.EVAL:
         print(blue_score(inference_loader, model, en_sp, device))
-        test_dataset = LanguageDataset(PATH_TO_DATA / 'test1.de-en.de')
-        test_dataset_tokenized = LanguageDatasetTokenized(test_dataset, de_sp, en_sp, 256)
+        # test_dataset = LanguageDataset(PATH_TO_DATA / 'test1.de-en.de')
+        # test_dataset_tokenized = LanguageDatasetTokenized(test_dataset, de_sp, en_sp, 256)
 
-        with open(PATH_TO_DATA / 'test1.de-en.en', 'w') as output_file: 
-            for batch in tqdm(test_dataset_tokenized):
-                source_tokens = batch.encoder_input.to(device).unsqueeze(0)
-                encoder_mask = ~batch.encoder_mask.unsqueeze(0).unsqueeze(1).unsqueeze(1).to(device)
+        # with open(PATH_TO_DATA / 'test1.de-en.en', 'w') as output_file: 
+        #     for batch in tqdm(test_dataset_tokenized):
+        #         source_tokens = batch.encoder_input.to(device).unsqueeze(0)
+        #         encoder_mask = ~batch.encoder_mask.unsqueeze(0).unsqueeze(1).unsqueeze(1).to(device)
 
-                target = inference(model, source_tokens, encoder_mask, en_sp, 128, device)
-                output_file.write(target + '\n')
+        #         target = inference(model, source_tokens, encoder_mask, en_sp, 128, device)
+        #         output_file.write(target + '\n')

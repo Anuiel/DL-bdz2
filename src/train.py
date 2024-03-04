@@ -1,11 +1,12 @@
 from enum import Enum, auto
-from typing import Callable, Generator
+from typing import Callable
 
 import torch
 from torch.utils.data import DataLoader
 from torch.optim import Optimizer
 from torch.optim.lr_scheduler import LRScheduler
 from tqdm import tqdm
+import wandb
 
 from src.transformer.transformer_net import Transformer
 
@@ -22,14 +23,14 @@ def run_epoch(
     scheduler: LRScheduler | None,
     mode: TrainMode,
     device: torch.device
-) -> Generator[float, None, None]:
+) -> None:
     if mode == TrainMode.TRAIN:
         model.train()
     elif mode == TrainMode.EVAL:
         model.eval()
-    optimizer.zero_grad()
+
     mask = Transformer.causal_mask(256).unsqueeze(0).to(device)
-    iterator = tqdm(enumerate(dataloader))
+    iterator = tqdm(enumerate(dataloader), total=len(dataloader))
     for i, batch in iterator:
 
         labels = batch.target_tokens.to(device)
@@ -45,12 +46,15 @@ def run_epoch(
 
         if mode == TrainMode.TRAIN:
             loss.backward()
-            if i % 3 == 0:
-                optimizer.step()
-                optimizer.zero_grad()
+            optimizer.step()
+            optimizer.zero_grad()
             if scheduler is not None:
                 scheduler.step()
 
-        yield loss.detach().cpu().item()
-        iterator.set_postfix({'loss': loss.detach().cpu().item()})
+        loss_item = loss.detach().cpu().item()
+        # wandb.log({
+        #     'train loss' if mode == TrainMode.TRAIN else 'val loss': loss_item,
+        #     'lr': optimizer.param_groups[0]['lr']
+        # })
+        iterator.set_postfix({'loss': loss_item, 'lr': optimizer.param_groups[0]['lr']})
         del loss
