@@ -80,3 +80,16 @@ def get_bleu_score(
             capture_output=True
         )
     return float(subprocess_dict.stdout.decode())
+
+
+def eval_test(
+    model: Seq2SeqTransformer,
+    test_dataset: Multi228k,
+    output_file_name: str,
+    text_transform: TextTransform,
+    config: Config
+):
+    with open(str(config.path_to_data / output_file), 'w') as output_file:
+        for source, _ in test_dataset:
+            target = translate(model, source, text_transform, config)
+            output_file.write(target + '\n')

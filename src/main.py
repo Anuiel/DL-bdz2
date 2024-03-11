@@ -13,7 +13,7 @@ from model import load_model
 from dataset import Multi228k
 from tokenizer import TextTransform, PAD_IDX
 from train import train_epoch, evaluate
-from inference import get_bleu_score
+from inference import get_bleu_score, eval_test
 
 
 RANDOM_SEED = 228
@@ -39,6 +39,7 @@ def main(git_hash: str):
 
     train_dataset = Multi228k(config.path_to_data, 'train', config.source_language, config.target_language)
     val_dataset = Multi228k(config.path_to_data, 'val', config.source_language, config.target_language)
+    test_dataset = Multi228k(config.path_to_data, 'test1', config.source_language, config.target_language)
 
     text_transform = TextTransform(config.path_to_data, config.source_language, config.target_language)
     source_vocab_size = len(text_transform.vocab_transform[config.source_language])
@@ -72,12 +73,14 @@ def main(git_hash: str):
         end_time = timer()
         val_loss = evaluate(model, val_dataloader, loss_function, config.device)
         bleu = get_bleu_score(model, val_dataset, text_transform, config)
+        eval_test(model, test_dataset, f'{run_id}-{epoch}.en')
         wandb.log({
             'epoch': epoch,
             'val loss': val_loss,
             'bleu': bleu,
             'epoch time': end_time - start_time
         })
+
     torch.save(model.state_dict(), config.path_to_data / 'models' / f'{run_id}.pth')
 
 
