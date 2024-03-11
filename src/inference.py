@@ -55,7 +55,7 @@ def translate(
     num_tokens = src.shape[0]
     src_mask = torch.zeros(num_tokens, num_tokens, dtype=torch.bool)
     tgt_tokens: Tensor = greedy_decode(
-        model, src, src_mask, max_len=num_tokens + 5, start_symbol=BOS_IDX
+        model, src, src_mask, max_len=num_tokens + 5, start_symbol=BOS_IDX, device=config.device
     ).flatten()
     return " ".join(
         text_transform.vocab_transform[config.target_language].lookup_tokens(list(tgt_tokens.cpu().numpy()))
