@@ -89,7 +89,7 @@ def eval_test(
     text_transform: TextTransform,
     config: Config
 ):
-    with open(str(config.path_to_data / output_file), 'w') as output_file:
+    with open(str(config.path_to_data / output_file_name), 'w') as output_file:
         for source, _ in test_dataset:
             target = translate(model, source, text_transform, config)
             output_file.write(target + '\n')

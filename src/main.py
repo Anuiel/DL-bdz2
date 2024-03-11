@@ -50,19 +50,21 @@ def main(git_hash: str):
     loss_function = torch.nn.CrossEntropyLoss(ignore_index=PAD_IDX, label_smoothing=config.label_smooting)
     lr_scheduler = None
 
+    train_gen = torch.Generator().manual_seed(RANDOM_SEED + RANDOM_SEED)
     train_dataloader = DataLoader(
         train_dataset,
         batch_size=config.batch_size,
         pin_memory=True,
         shuffle=True,
-        collate_fn=text_transform.collate_fn
+        collate_fn=text_transform.collate_fn,
+        generator=train_gen
     )
     val_dataloader = DataLoader(
         val_dataset,
         batch_size=config.batch_size,
         pin_memory=True,
         shuffle=False,
-        collate_fn=text_transform.collate_fn
+        collate_fn=text_transform.collate_fn,
     )
     cumulative_step = 0
     for epoch in range(1, config.n_epoch + 1):
