@@ -73,7 +73,7 @@ def main(git_hash: str):
         end_time = timer()
         val_loss = evaluate(model, val_dataloader, loss_function, config.device)
         bleu = get_bleu_score(model, val_dataset, text_transform, config)
-        eval_test(model, test_dataset, f'{run_id}-{epoch}.en')
+        eval_test(model, test_dataset, f'{run_id}-{epoch}.en', text_transform, config)
         wandb.log({
             'epoch': epoch,
             'val loss': val_loss,
