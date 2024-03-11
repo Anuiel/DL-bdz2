@@ -1,22 +1,26 @@
 from dataclasses import dataclass, field
-import typing as tp
+from pathlib import Path
+
+import torch
 
 @dataclass
-class ModelConfig:
-    source_vocab_size: int =16000,
-    target_vocab_size: int = 16000,
-    max_len: int = 256,
-    N: int = 6,
-    embed_dim: int = 256,
-    fc_dim: int = 1024,
-    heads: int = 4,
-    dropout_rate: float = 0.15
+class Config:
+    path_to_data: Path = Path('data')
+    source_language: str = 'de'
+    target_language: str = 'en'
 
+    embedding_size: int = 512
+    number_of_heads: int = 8
+    feed_forward_hidden_size: int = 1024
+    encoder_layers_num: int = 3
+    decoder_layer_num: int = 3
+    dropout_rate: float = 0.1
 
-@dataclass
-class MegaConfig:
-    model_name: str
-    batch_size: int
-    max_len: int
-    model_params: ModelConfig = field(default_factory=lambda: ModelConfig())
-    
+    n_epoch: int = 12
+    batch_size: int = 32
+
+    learning_rate: float = 1e-4
+
+    label_smooting: float = 0.0
+
+    device: torch.device = torch.device('cuda')

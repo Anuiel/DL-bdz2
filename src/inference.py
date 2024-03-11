@@ -1,105 +1,81 @@
-from pathlib import Path
+import subprocess
+import tempfile
 
 import torch
-from torch.distributions.categorical import Categorical
-from torch.utils.data import DataLoader
-from sentencepiece import SentencePieceProcessor
-from tqdm import tqdm
-from sacrebleu.metrics import BLEUScore, BLEU
+from torch import Tensor
 
-from src.transformer import Transformer
+from model import Seq2SeqTransformer
+from tokenizer import TextTransform, EOS_IDX, BOS_IDX
+from train import generate_square_subsequent_mask
+from config import Config
+from dataset import Multi228k
 
-
-def top_sampling(logits: torch.Tensor, k: int = 50, p: float = 0.92):
-    if k > 0:
-        indices_to_remove = logits < torch.topk(logits, k)[0][-1, None]
-        logits[indices_to_remove] = -torch.inf
-    sorted_logits, sorted_indices = torch.sort(logits, descending=True)
-
-    cumulative_probs = torch.cumsum(torch.nn.functional.softmax(sorted_logits, dim=-1), dim=-1)
-    sorted_indices_to_remove = cumulative_probs > p
-    sorted_indices_to_remove[1:] = sorted_indices_to_remove[:-1].clone()
-    sorted_indices_to_remove[0] = 0
-    
-    sorted_logits[sorted_indices_to_remove] = -torch.inf
-    logits = torch.gather(sorted_logits, 0, sorted_indices.argsort(-1))
-    pred_token = torch.multinomial(torch.nn.functional.softmax(logits, -1), 1)
-    return pred_token
-
-
-def greedy_sampling(logits: torch.Tensor):
-    return logits.argmax(dim=-1)
-
-
-@torch.no_grad()
-def inference(
-    model: Transformer,
-    source_tokens: torch.Tensor,
-    source_mask: torch.Tensor,
-    target_tokenizer: SentencePieceProcessor,
+def greedy_decode(
+    model: Seq2SeqTransformer,
+    src: Tensor,
+    src_mask: Tensor,
     max_len: int,
+    start_symbol: int,
     device: torch.device
-) -> str:
-    model.eval()
+) -> Tensor:
+    src = src.to(device)
+    src_mask = src_mask.to(device)
 
-    bos_id = target_tokenizer.bos_id()
-    eos_id = target_tokenizer.eos_id()
+    memory = model.encode(src, src_mask)
+    ys = torch.ones(1, 1).fill_(start_symbol).type(torch.long).to(device)
+    for i in range(max_len - 1):
+        memory = memory.to(device)
+        tgt_mask = (generate_square_subsequent_mask(ys.size(0)).type(torch.bool)).to(device)
+        out = model.decode(ys, memory, tgt_mask)
+        out = out.transpose(0, 1)
+        prob = model.generator(out[:, -1])
+        _, next_word = torch.max(prob, dim=1)
+        next_word = next_word.item()
 
-    encoder_output = model.encode(source_tokens, source_mask)
-
-    decoder_input = torch.empty(1, 1).fill_(bos_id).type_as(source_tokens).to(device)
-
-    while True:
-        if decoder_input.size(1) >= max_len:
-            break
-
-        decoder_mask = ~model.causal_mask(decoder_input.size(1)).type_as(source_mask).to(device)
-
-        out = model.decode(decoder_input, decoder_mask, encoder_output, source_mask)
-        logits = model.generate(out[:, -1].squeeze(0))
-        next_token = top_sampling(logits, k=1, p=0.92)
-
-        decoder_input = torch.cat(
-            [decoder_input, torch.empty(1, 1).type_as(source_tokens).fill_(next_token.item()).to(device)], dim=1
+        ys = torch.cat(
+            [
+                ys,
+                torch.ones(1, 1).type_as(src.data).fill_(next_word)
+            ], 
+            dim=0
         )
-        if next_token == eos_id:
+        if next_word == EOS_IDX:
             break
+    return ys
 
-    return target_tokenizer.Decode(list(map(int, decoder_input.squeeze(0).detach().cpu().numpy())))
 
-
-@torch.no_grad()
-def blue_score(
-    loader: DataLoader,
-    model: Transformer,
-    target_tokenizer: SentencePieceProcessor,
-    device: torch.device
-) -> BLEUScore:
-    scorer = BLEU(
-        tokenize=None
-    )
-
-    ground_truth = []
-    predicted = []
-    for batch in tqdm(loader):
-        source_tokens = batch.encoder_input.to(device).unsqueeze(0)
-        encoder_mask = ~batch.encoder_mask.unsqueeze(0).unsqueeze(1).to(device)
-        target = inference(model, source_tokens, encoder_mask, target_tokenizer, 128, device)
-        ground_truth.append(batch.original_text['target_text'][0])
-        predicted.append(target)
-    return scorer.corpus_score(predicted, [ground_truth])
-
-def eval_test(
-    path_to_file: Path,
-    loader: DataLoader,
-    model: Transformer,
-    target_tokenizer: SentencePieceProcessor,
-    device: torch.device,
+def translate(
+    model: Seq2SeqTransformer,
+    text_transform: TextTransform,
+    src_sentence: str,
+    config: Config
 ):
-    with open(path_to_file, 'w') as output_file: 
-        for batch in tqdm(loader):
-            source_tokens = batch.encoder_input.to(device).unsqueeze(0)
-            encoder_mask = ~batch.encoder_mask.unsqueeze(0).unsqueeze(1).unsqueeze(1).to(device)
+    model.eval()
+    src = text_transform.text_transform[config.source_language](src_sentence).view(-1, 1)
+    num_tokens = src.shape[0]
+    src_mask = torch.zeros(num_tokens, num_tokens, dtype=torch.bool)
+    tgt_tokens: Tensor = greedy_decode(
+        model, src, src_mask, max_len=num_tokens + 5, start_symbol=BOS_IDX
+    ).flatten()
+    return " ".join(
+        text_transform.vocab_transform[config.target_language].lookup_tokens(list(tgt_tokens.cpu().numpy()))
+    ).replace("<bos>", "").replace("<eos>", "").replace("<unk>", "")
 
-            target = inference(model, source_tokens, encoder_mask, target_tokenizer, 128, device)
-            output_file.write(target + '\n')
+
+def get_bleu_score(
+    model: Seq2SeqTransformer,
+    val_dataset: Multi228k,
+    text_transform: TextTransform,
+    config: Config,
+):
+    model.eval()
+    with tempfile.TemporaryFile('w') as tmp_file:
+        for source, _ in val_dataset:
+            target = translate(model, source)
+            tmp_file.write(target + '\n')
+        subprocess_dict = subprocess.run(
+            f'cat {tmp_file.name} | sacrebleu data/val.de-en.en --tokenize none --width 2 -b',
+            shell=True,
+            capture_output=True
+        )
+    return float(subprocess_dict.stdout.decode())

@@ -1,60 +1,94 @@
-from enum import Enum, auto
 from typing import Callable
 
 import torch
 from torch.utils.data import DataLoader
-from torch.optim import Optimizer
-from torch.optim.lr_scheduler import LRScheduler
-from tqdm import tqdm
 import wandb
 
-from src.transformer.transformer_net import Transformer
-
-class TrainMode(Enum):
-    TRAIN = auto()
-    EVAL = auto()
+from model import Seq2SeqTransformer
+from tokenizer import PAD_IDX
 
 
-def run_epoch(
-    model: Transformer,
-    dataloader: DataLoader,
-    optimizer: Optimizer,
-    loss_func: Callable[[torch.Tensor, torch.Tensor], torch.Tensor],
-    scheduler: LRScheduler | None,
-    mode: TrainMode,
-    device: torch.device
-) -> None:
-    if mode == TrainMode.TRAIN:
-        model.train()
-    elif mode == TrainMode.EVAL:
-        model.eval()
+def generate_square_subsequent_mask(sz: int, device: torch.device) -> torch.Tensor:
+    mask = (torch.triu(torch.ones((sz, sz), device=device)) == 1).transpose(0, 1)
+    mask = mask.float().masked_fill(mask == 0, float('-inf')).masked_fill(mask == 1, float(0.0))
+    return mask
 
-    mask = Transformer.causal_mask(256).unsqueeze(0).to(device)
-    iterator = tqdm(enumerate(dataloader), total=len(dataloader))
-    for i, batch in iterator:
 
-        labels = batch.target_tokens.to(device)
+def create_mask(src, tgt, device: torch.device):
+    src_seq_len = src.shape[0]
+    tgt_seq_len = tgt.shape[0]
 
-        out = model.forward(
-            batch.encoder_input.to(device),
-            batch.decoder_input.to(device),
-            ~batch.encoder_mask.unsqueeze(1).unsqueeze(1).to(device),
-            ~(batch.decoder_mask.unsqueeze(1).to(device) & mask).unsqueeze(1)
-        )
+    tgt_mask = generate_square_subsequent_mask(tgt_seq_len, device=device)
+    src_mask = torch.zeros((src_seq_len, src_seq_len), device=device).type(torch.bool)
 
-        loss = loss_func(out, labels)
+    src_padding_mask = (src == PAD_IDX).transpose(0, 1)
+    tgt_padding_mask = (tgt == PAD_IDX).transpose(0, 1)
+    return src_mask, tgt_mask, src_padding_mask, tgt_padding_mask
 
-        if mode == TrainMode.TRAIN:
-            loss.backward()
-            optimizer.step()
-            optimizer.zero_grad()
-            if scheduler is not None:
-                scheduler.step()
 
-        loss_item = loss.detach().cpu().item()
-        # wandb.log({
-        #     'train loss' if mode == TrainMode.TRAIN else 'val loss': loss_item,
-        #     'lr': optimizer.param_groups[0]['lr']
-        # })
-        iterator.set_postfix({'loss': loss_item, 'lr': optimizer.param_groups[0]['lr']})
-        del loss
+def train_log(loss: float, example_ct: int, epoch: int) -> None:
+    wandb.log({"epoch": epoch, "loss": loss}, step=example_ct)
+
+def train_epoch(
+    model: Seq2SeqTransformer,
+    optimizer: torch.optim.Optimizer,
+    data_loader: DataLoader,
+    loss_function: Callable[[torch.Tensor, torch.Tensor], torch.Tensor],
+    device: torch.device,
+    epoch: int,
+    scheduler: torch.optim.lr_scheduler.LRScheduler | None = None
+) -> float:
+    model.train()
+    wandb.watch(model, loss_function, log="all", log_freq=10)
+    losses = 0
+    for batch_idx, (src, tgt) in enumerate(data_loader):
+        src = src.to(device)
+        tgt = tgt.to(device)
+
+        tgt_input = tgt[:-1, :]
+
+        src_mask, tgt_mask, src_padding_mask, tgt_padding_mask = create_mask(src, tgt_input, device=device)
+
+        logits = model.forward(src, tgt_input, src_mask, tgt_mask,src_padding_mask, tgt_padding_mask, src_padding_mask)
+
+        optimizer.zero_grad()
+
+        tgt_out = tgt[1:, :]
+        loss = loss_function(logits.reshape(-1, logits.shape[-1]), tgt_out.reshape(-1))
+        loss.backward()
+
+        optimizer.step()
+        if scheduler is not None:
+            scheduler.step()
+        loss = loss.item()
+
+        if (batch_idx + 1) % 25 == 0:
+            train_log(loss, batch_idx * data_loader.batch_size, epoch)
+        losses += loss
+
+    return losses / len(list(data_loader))
+
+@torch.no_grad()
+def evaluate(
+    model: Seq2SeqTransformer,
+    data_loader: DataLoader,
+    loss_function: Callable[[torch.Tensor, torch.Tensor], torch.Tensor],
+    device: torch.device,
+) -> float:
+    model.eval()
+    losses = 0
+    for src, tgt in data_loader:
+        src = src.to(device)
+        tgt = tgt.to(device)
+
+        tgt_input = tgt[:-1, :]
+
+        src_mask, tgt_mask, src_padding_mask, tgt_padding_mask = create_mask(src, tgt_input, device=device)
+
+        logits = model.forward(src, tgt_input, src_mask, tgt_mask,src_padding_mask, tgt_padding_mask, src_padding_mask)
+
+        tgt_out = tgt[1:, :]
+        loss = loss_function(logits.reshape(-1, logits.shape[-1]), tgt_out.reshape(-1))
+        losses += loss.item()
+
+    return losses / len(list(data_loader))
