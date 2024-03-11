@@ -46,8 +46,8 @@ def greedy_decode(
 
 def translate(
     model: Seq2SeqTransformer,
-    text_transform: TextTransform,
     src_sentence: str,
+    text_transform: TextTransform,
     config: Config
 ):
     model.eval()
@@ -71,7 +71,7 @@ def get_bleu_score(
     model.eval()
     with tempfile.TemporaryFile('w') as tmp_file:
         for source, _ in val_dataset:
-            target = translate(model, source)
+            target = translate(model, source, text_transform, config)
             tmp_file.write(target + '\n')
         subprocess_dict = subprocess.run(
             f'cat {tmp_file.name} | sacrebleu data/val.de-en.en --tokenize none --width 2 -b',
