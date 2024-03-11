@@ -63,16 +63,17 @@ def main(git_hash: str):
         shuffle=False,
         collate_fn=text_transform.collate_fn
     )
-
+    cumulative_step = 0
     for epoch in range(1, config.n_epoch + 1):
         torch.cuda.empty_cache()
         start_time = timer()
-        train_loss = train_epoch(model, optim, train_dataloader, loss_function, config.device, epoch, lr_scheduler)
+        _, cumulative_step = train_epoch(model, optim, train_dataloader, loss_function, config.device, cumulative_step, lr_scheduler)
         torch.cuda.empty_cache()
         end_time = timer()
         val_loss = evaluate(model, val_dataloader, loss_function, config.device)
         bleu = get_bleu_score(model, val_dataset, text_transform, config)
         wandb.log({
+            'epoch': epoch,
             'val loss': val_loss,
             'bleu': bleu,
             'epoch time': end_time - start_time

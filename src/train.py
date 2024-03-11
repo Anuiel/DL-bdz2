@@ -26,22 +26,19 @@ def create_mask(src, tgt, device: torch.device):
     return src_mask, tgt_mask, src_padding_mask, tgt_padding_mask
 
 
-def train_log(loss: float, example_ct: int, epoch: int) -> None:
-    wandb.log({"epoch": epoch, "loss": loss}, step=example_ct)
-
 def train_epoch(
     model: Seq2SeqTransformer,
     optimizer: torch.optim.Optimizer,
     data_loader: DataLoader,
     loss_function: Callable[[torch.Tensor, torch.Tensor], torch.Tensor],
     device: torch.device,
-    epoch: int,
+    cumulative_index: int,
     scheduler: torch.optim.lr_scheduler.LRScheduler | None = None
 ) -> float:
     model.train()
     wandb.watch(model, loss_function, log="all", log_freq=10)
     losses = 0
-    for batch_idx, (src, tgt) in enumerate(data_loader):
+    for src, tgt in data_loader:
         src = src.to(device)
         tgt = tgt.to(device)
 
@@ -61,12 +58,16 @@ def train_epoch(
         if scheduler is not None:
             scheduler.step()
         loss = loss.item()
-
-        if (batch_idx + 1) % 25 == 0:
-            train_log(loss, batch_idx * data_loader.batch_size, epoch)
+        if (cumulative_index + 1) % 25 == 0:
+            wandb.log({
+                "loss": loss,
+                "step": cumulative_index * data_loader.batch_size
+            }
+        )
+        cumulative_index += 1
         losses += loss
 
-    return losses / len(list(data_loader))
+    return losses / len(list(data_loader)), cumulative_index
 
 @torch.no_grad()
 def evaluate(
