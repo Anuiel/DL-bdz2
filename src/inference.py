@@ -25,7 +25,7 @@ def greedy_decode(
     ys = torch.ones(1, 1).fill_(start_symbol).type(torch.long).to(device)
     for i in range(max_len - 1):
         memory = memory.to(device)
-        tgt_mask = (generate_square_subsequent_mask(ys.size(0)).type(torch.bool)).to(device)
+        tgt_mask = generate_square_subsequent_mask(ys.size(0), device=device).type(torch.bool)
         out = model.decode(ys, memory, tgt_mask)
         out = out.transpose(0, 1)
         prob = model.generator(out[:, -1])
