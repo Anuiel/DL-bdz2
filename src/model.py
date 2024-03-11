@@ -145,9 +145,11 @@ def load_model(
         config.dropout_rate
     )
     if model_weights is None:
+        generator = torch.Generator()
+        generator.manual_seed(228)
         for p in transformer.parameters():
             if p.dim() > 1:
-                nn.init.xavier_uniform_(p)
+                nn.init.xavier_uniform_(p, generator=generator)
     else:
         transformer.load_state_dict(torch.load(model_weights))
 

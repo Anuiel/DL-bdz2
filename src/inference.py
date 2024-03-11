@@ -69,10 +69,11 @@ def get_bleu_score(
     config: Config,
 ):
     model.eval()
-    with tempfile.TemporaryFile('w') as tmp_file:
+    with tempfile.NamedTemporaryFile('w') as tmp_file:
         for source, _ in val_dataset:
             target = translate(model, source, text_transform, config)
             tmp_file.write(target + '\n')
+        tmp_file.seek(0)
         subprocess_dict = subprocess.run(
             f'cat {tmp_file.name} | sacrebleu data/val.de-en.en --tokenize none --width 2 -b',
             shell=True,

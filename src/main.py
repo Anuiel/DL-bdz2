@@ -53,7 +53,7 @@ def main(git_hash: str):
         train_dataset,
         batch_size=config.batch_size,
         pin_memory=True,
-        shuffle=False,
+        shuffle=True,
         collate_fn=text_transform.collate_fn
     )
     val_dataloader = DataLoader(
