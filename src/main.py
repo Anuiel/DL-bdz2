@@ -48,7 +48,11 @@ def main(git_hash: str):
     model = load_model(config, source_vocab_size, target_vocab_size).to(config.device)
     optim = torch.optim.Adam(model.parameters(), lr=config.learning_rate, betas=(0.9, 0.98), eps=1e-9)
     loss_function = torch.nn.CrossEntropyLoss(ignore_index=PAD_IDX, label_smoothing=config.label_smooting)
-    lr_scheduler = None
+    lr_scheduler = torch.optim.lr_scheduler.MultiStepLR(
+        optim,
+        [5, 10],
+        0.3
+    )
 
     train_gen = torch.Generator().manual_seed(RANDOM_SEED + RANDOM_SEED)
     train_dataloader = DataLoader(
@@ -70,11 +74,12 @@ def main(git_hash: str):
     for epoch in range(1, config.n_epoch + 1):
         torch.cuda.empty_cache()
         start_time = timer()
-        _, cumulative_step = train_epoch(model, optim, train_dataloader, loss_function, config.device, cumulative_step, lr_scheduler)
+        _, cumulative_step = train_epoch(model, optim, train_dataloader, loss_function, config.device, cumulative_step)
         torch.cuda.empty_cache()
         end_time = timer()
         val_loss = evaluate(model, val_dataloader, loss_function, config.device)
         bleu = get_bleu_score(model, val_dataset, text_transform, config)
+        lr_scheduler.step()
         eval_test(model, test_dataset, f'{run_id}-{epoch}.en', text_transform, config)
         wandb.log({
             'epoch': epoch,

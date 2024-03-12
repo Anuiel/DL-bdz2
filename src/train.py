@@ -33,7 +33,6 @@ def train_epoch(
     loss_function: Callable[[torch.Tensor, torch.Tensor], torch.Tensor],
     device: torch.device,
     cumulative_index: int,
-    scheduler: torch.optim.lr_scheduler.LRScheduler | None = None
 ) -> float:
     model.train()
     losses = 0
@@ -54,8 +53,6 @@ def train_epoch(
         loss.backward()
 
         optimizer.step()
-        if scheduler is not None:
-            scheduler.step()
         loss = loss.item()
         if (cumulative_index + 1) % 25 == 0:
             wandb.log({
