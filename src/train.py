@@ -36,7 +36,6 @@ def train_epoch(
     scheduler: torch.optim.lr_scheduler.LRScheduler | None = None
 ) -> float:
     model.train()
-    wandb.watch(model, loss_function, log="all", log_freq=10)
     losses = 0
     for src, tgt in data_loader:
         src = src.to(device)
