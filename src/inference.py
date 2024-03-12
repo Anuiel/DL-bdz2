@@ -10,6 +10,8 @@ from train import generate_square_subsequent_mask
 from config import Config
 from dataset import Multi228k
 
+
+@torch.no_grad()
 def greedy_decode(
     model: Seq2SeqTransformer,
     src: Tensor,
