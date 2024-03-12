@@ -16,7 +16,7 @@ class Config:
     decoder_layer_num: int = 5
     dropout_rate: float = 0.1
 
-    n_epoch: int = 12
+    n_epoch: int = 8
     batch_size: int = 32
 
     learning_rate: float = 1e-4
