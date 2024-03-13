@@ -9,11 +9,11 @@ class Config:
     source_language: str = 'de'
     target_language: str = 'en'
 
-    embedding_size: int = 1024
+    embedding_size: int = 512
     number_of_heads: int = 8
-    feed_forward_hidden_size: int = 2048
-    encoder_layers_num: int = 5
-    decoder_layer_num: int = 5
+    feed_forward_hidden_size: int = 512
+    encoder_layers_num: int = 3
+    decoder_layer_num: int = 3
     dropout_rate: float = 0.1
 
     n_epoch: int = 20

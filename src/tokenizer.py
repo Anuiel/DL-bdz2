@@ -35,7 +35,7 @@ class TextTransform:
             train_iter = Multi228k(path_to_data, ['train', 'val', 'test1'], source_language, target_language)
             self.vocab_transform[ln] = build_vocab_from_iterator(
                 yield_tokens(train_iter, ln),
-                min_freq=2,
+                min_freq=3,
                 specials=SPECIAL_SYMBOLS,
                 special_first=True
             )
