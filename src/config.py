@@ -19,7 +19,7 @@ class Config:
     n_epoch: int = 6
     batch_size: int = 16
 
-    learning_rate: float = 0.0005
+    learning_rate: float = 0.0002
 
     label_smooting: float = 0.0
 
