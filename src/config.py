@@ -12,11 +12,11 @@ class Config:
     embedding_size: int = 512
     number_of_heads: int = 8
     feed_forward_hidden_size: int = 512
-    encoder_layers_num: int = 5
-    decoder_layer_num: int = 5
+    encoder_layers_num: int = 3
+    decoder_layer_num: int = 3
     dropout_rate: float = 0.1
 
-    n_epoch: int = 6
+    n_epoch: int = 1
     batch_size: int = 16
 
     learning_rate: float = 0.0002
