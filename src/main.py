@@ -50,7 +50,7 @@ def main(git_hash: str):
     loss_function = torch.nn.CrossEntropyLoss(ignore_index=PAD_IDX, label_smoothing=config.label_smooting)
     lr_scheduler = torch.optim.lr_scheduler.MultiStepLR(
         optim,
-        [2, 5],
+        [3, 5],
         0.2
     )
 
