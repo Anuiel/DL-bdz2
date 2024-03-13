@@ -3,7 +3,7 @@ from torch import Tensor
 
 from model import Seq2SeqTransformer
 from train import generate_square_subsequent_mask
-from tokenizer import BOS_IDX, EOS_IDX
+from tokenizer import EOS_IDX
 
 @torch.no_grad()
 def beam_search_smater(
@@ -25,12 +25,7 @@ def beam_search_smater(
     top_log_probs = torch.zeros(width, 1, device=device)
     finished: list[tuple[float, Tensor]] = []
     for step in range(max_len - 1):
-        # print("STEP", step)
-        # print(ys)
         tgt_mask = generate_square_subsequent_mask(ys.size(0), device=device).type(torch.bool)
-        # print(tgt_mask.shape)
-        # print(ys.shape)
-        # print(memory.shape)
         out = model.decode(ys, memory.repeat(1, ys.size(1), 1), tgt_mask) # (lenght, hypotesis_count, embed_dim)
         out = out.transpose(0, 1) # (hypotesis_count, lenght, embed_dim)
         log_prob = torch.nn.functional.log_softmax(model.generator(out[:, -1, :]) / temp, dim=1) / (step+1)**length_penalty # (hypotesis_count, vocab_size)
@@ -42,7 +37,6 @@ def beam_search_smater(
         # top_log_probs + best_log_prob: (hypotesis_count, width)
         # (top_log_probs + best_log_prob)[A, B] - if to batch A add token B
         next_log_prob = top_log_probs + best_log_prob
-        # print(next_log_prob)
         # torch.argsort cannot to dim=None, so ravel()
         next_top_idx = next_log_prob.ravel().argsort()
         if step > 0:
@@ -51,13 +45,9 @@ def beam_search_smater(
         else:
             next_batch_idx = torch.zeros(width, dtype=torch.long)
             next_token_idx = torch.arange(width, dtype=torch.long)
-        # print(next_token_idx)
-        # print(next_batch_idx)
         next_batches: list[Tensor] = []
         for batch_idx, token_idx in zip(next_batch_idx, next_token_idx):
-            # print('IN FOR', batch_idx, token_idx)
             next_token = best_tokens[batch_idx, token_idx]
-            # print(next_token)
             next_batch = torch.cat((ys[:, batch_idx], next_token.unsqueeze(0))).unsqueeze(1) # (lenght, 1)
             if next_token.item() == EOS_IDX:
                 finished.append(
