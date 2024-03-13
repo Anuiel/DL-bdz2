@@ -1,3 +1,4 @@
+from typing import Callable
 import subprocess
 import tempfile
 
@@ -50,7 +51,8 @@ def translate(
     model: Seq2SeqTransformer,
     src_sentence: str,
     text_transform: TextTransform,
-    config: Config
+    config: Config,
+    decode_function: Callable[[Seq2SeqTransformer, Tensor, Tensor, int, torch.device], Tensor]
 ):
     model.eval()
     src = text_transform.text_transform[config.source_language](src_sentence).view(-1, 1)
@@ -59,6 +61,9 @@ def translate(
     tgt_tokens: Tensor = greedy_decode(
         model, src, src_mask, max_len=num_tokens + 20, start_symbol=BOS_IDX, device=config.device
     ).flatten()
+    tgt_tokens: Tensor = decode_function(
+        model, src, src_mask, num_tokens + 20, config.device
+    )
     return " ".join(
         text_transform.vocab_transform[config.target_language].lookup_tokens(list(tgt_tokens.cpu().numpy()))
     ).replace("<bos>", "").replace("<eos>", "").replace("<unk>", "")
@@ -69,15 +74,16 @@ def get_bleu_score(
     val_dataset: Multi228k,
     text_transform: TextTransform,
     config: Config,
+    decode_function: Callable[[Seq2SeqTransformer, Tensor, Tensor, int, torch.device], Tensor]
 ):
     model.eval()
     with tempfile.NamedTemporaryFile('w') as tmp_file:
         for source, _ in val_dataset:
-            target = translate(model, source, text_transform, config)
+            target = translate(model, source, text_transform, config, decode_function)
             tmp_file.write(target + '\n')
         tmp_file.seek(0)
         subprocess_dict = subprocess.run(
-            f'cat {tmp_file.name} | sacrebleu data/val.de-en.en --tokenize none --width 2 -b',
+            f'cat {tmp_file.name} | sacrebleu {str(config.path_to_data)}/val.de-en.en --tokenize none --width 2 -b',
             shell=True,
             capture_output=True
         )
@@ -89,9 +95,10 @@ def eval_test(
     test_dataset: Multi228k,
     output_file_name: str,
     text_transform: TextTransform,
-    config: Config
+    config: Config,
+    decode_function: Callable[[Seq2SeqTransformer, Tensor, Tensor, int, torch.device], Tensor]
 ):
     with open(str(config.path_to_data / output_file_name), 'w') as output_file:
         for source, _ in test_dataset:
-            target = translate(model, source, text_transform, config)
+            target = translate(model, source, text_transform, config, decode_function)
             output_file.write(target + '\n')

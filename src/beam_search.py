@@ -33,7 +33,7 @@ def beam_search_smater(
         # print(memory.shape)
         out = model.decode(ys, memory.repeat(1, ys.size(1), 1), tgt_mask) # (lenght, hypotesis_count, embed_dim)
         out = out.transpose(0, 1) # (hypotesis_count, lenght, embed_dim)
-        log_prob = torch.nn.functional.log_softmax(model.generator(out[:, -1, :]) / temp, dim=1) * (step+1)**length_penalty # (hypotesis_count, vocab_size)
+        log_prob = torch.nn.functional.log_softmax(model.generator(out[:, -1, :]) / temp, dim=1) / (step+1)**length_penalty # (hypotesis_count, vocab_size)
         best_log_prob, best_tokens = log_prob.topk(width, dim=1, largest=True, sorted=True)
 
         # print(best_log_prob, best_tokens)
@@ -125,8 +125,8 @@ def beam_search_v_ebalo(
                     new_hypotesis.append(pair)
         if len(finished) >= 2 * width:
             break
-        new_hypotesis.sort(key=lambda x: x[0])
+        new_hypotesis.sort(key=lambda x: -x[0])
         hypotesis = new_hypotesis[:width]
     if len(finished) < 2 * width:
         finished += hypotesis
-    return finished
+    return max(finished, key=lambda x: x[0])[1]
