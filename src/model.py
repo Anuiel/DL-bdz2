@@ -68,6 +68,8 @@ class Seq2SeqTransformer(nn.Module):
             num_decoder_layers=num_decoder_layers,
             dim_feedforward=dim_feedforward,
             dropout=dropout,
+            activation='gelu',
+            layer_norm_eps=1e-6
         )
         self.generator = nn.Linear(emb_size, tgt_vocab_size)
         self.src_tok_emb = TokenEmbedding(src_vocab_size, emb_size)
