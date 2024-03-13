@@ -17,7 +17,7 @@ class Config:
     dropout_rate: float = 0.1
 
     n_epoch: int = 20
-    batch_size: int = 64
+    batch_size: int = 128
 
     learning_rate: float = 1e-4
 
