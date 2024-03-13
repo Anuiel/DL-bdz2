@@ -18,10 +18,10 @@ from inference import get_bleu_score, eval_test
 
 RANDOM_SEED = 228
 torch.backends.cudnn.deterministic = True
-random.seed(RANDOM_SEED)
-np.random.seed(RANDOM_SEED)
-torch.manual_seed(RANDOM_SEED)
-torch.cuda.manual_seed_all(RANDOM_SEED)
+random.seed(RANDOM_SEED + 1)
+np.random.seed(RANDOM_SEED + 2)
+torch.manual_seed(RANDOM_SEED + 3)
+torch.cuda.manual_seed_all(RANDOM_SEED + 4)
 
 
 @click.command()

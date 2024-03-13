@@ -9,14 +9,14 @@ class Config:
     source_language: str = 'de'
     target_language: str = 'en'
 
-    embedding_size: int = 512
+    embedding_size: int = 1024
     number_of_heads: int = 8
-    feed_forward_hidden_size: int = 512
-    encoder_layers_num: int = 3
-    decoder_layer_num: int = 3
+    feed_forward_hidden_size: int = 2048
+    encoder_layers_num: int = 5
+    decoder_layer_num: int = 5
     dropout_rate: float = 0.1
 
-    n_epoch: int = 12
+    n_epoch: int = 20
     batch_size: int = 64
 
     learning_rate: float = 1e-4
